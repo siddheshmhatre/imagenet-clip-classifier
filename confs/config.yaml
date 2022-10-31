@@ -1,0 +1,28 @@
+num_epochs : 500
+logging_freq : 100
+seed : 1234
+
+dataset:
+  root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
+  batch_size : 2
+  num_workers : 12
+  download : false
+  train_shuffle : true
+  test_shuffle : false
+  pin_memory : true
+
+optim:
+  learning_rate : 0.01
+  momentum : 0.9
+
+wandb:
+  project : clip_imagenet1k
+  entity : sid1793
+  mode : online # [online, offline, disabled]
+  tags :
+    - mlp
+    - clip_embeddings
+
+hydra:
+  run:
+    dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}

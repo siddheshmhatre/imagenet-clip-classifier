@@ -1,1 +1,4 @@
 .ipynb_checkpoints/*
+imagenet1k_clip_embeddings/*
+outputs/*
+__pycache__/*

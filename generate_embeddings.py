@@ -8,9 +8,10 @@ from transformers import CLIPModel, CLIPFeatureExtractor
 def main():
 	# Hard-coding args for now
 	model_name = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
-	batch_size = 384
-	num_workers = 16
+	batch_size = 1
+	num_workers = 4
 	dataset_name = "imagenet-1k"
+	embeddings_dir = "imagenet1k_clip_embeddings"
 
 	# Create data loaders
 	dataset = load_dataset(dataset_name)
@@ -33,10 +34,7 @@ def main():
 	model.to('cuda')
 	print (f"MODEL {model.device}")
 
-	embeddings_dict = {}
-	embeddings_dict['embeddings'] = None
-	embeddings_dict['labels'] = None
-	embeddings_dict['images'] = None
+	counter = 1
 
 	# Iterate through dataset
 	for data in tqdm(train_dl):
@@ -47,20 +45,19 @@ def main():
 
 			embeddings = model.get_image_features(data['image'])
 
-			# Store embeddings
-			if embeddings_dict['embeddings'] == None:
-				embeddings_dict['embeddings'] = embeddings
-				embeddings_dict['labels'] = data['label']
-				embeddings_dict['images'] = data['image']
-			else:
-				embeddings_dict['embeddings'] = torch.vstack([embeddings_dict['embeddings'], embeddings])
-				embeddings_dict['labels'] = torch.vstack([embeddings_dict['labels'], data['label']])
-				embeddings_dict['images'] = torch.vstack([embeddings_dict['images'], data['image']])
+			embeddings_dict = {}
+			embeddings_dict['embeddings'] = embeddings
+			embeddings_dict['labels'] = data['label']
+			embeddings_dict['images'] = data['image']
 
-	# Save to disk
-	embeddings_dict['embeddings'] = embeddings_dict['embeddings'].to('cpu')
-	embeddings_dict['images'] = embeddings_dict['images'].to('cpu')
-	torch.save(embeddings_dict, "imagenet1k_train_clip_embeddings.pt")
+			# Save to disk
+			embeddings_dict['embeddings'] = embeddings_dict['embeddings'].to('cpu')
+			embeddings_dict['images'] = embeddings_dict['images'].to('cpu')
+			torch.save(embeddings_dict, f"{embeddings_dir}/{counter}.pt")
+
+			counter += 1
+
+			del embeddings_dict
 
 if __name__ == "__main__":
 	main()
