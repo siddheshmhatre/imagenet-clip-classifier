@@ -1,4 +1,4 @@
-import time
+import os
 import torch
 from tqdm import tqdm
 from datasets import load_dataset
@@ -12,6 +12,7 @@ def main():
 	num_workers = 4
 	dataset_name = "imagenet-1k"
 	embeddings_dir = "imagenet1k_clip_embeddings"
+	dataset_type = "validation"
 
 	# Create data loaders
 	dataset = load_dataset(dataset_name)
@@ -23,11 +24,8 @@ def main():
 		return example
 
 	dataset.set_transform(transform) # Doing this stops returning "image" as a tensor
-	train_ds, val_ds = dataset['train'], dataset['validation']
 
-	train_dl = DataLoader(train_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True)
-
-	val_dl = DataLoader(val_ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+	dl = DataLoader(dataset[dataset_type], batch_size=batch_size, num_workers=num_workers, shuffle=True)
 
 	# Create model
 	model = CLIPModel.from_pretrained(model_name)
@@ -36,8 +34,12 @@ def main():
 
 	counter = 1
 
+	embeddings_dir = os.path.join(embeddings_dir, dataset_type)
+	if not os.path.exists(embeddings_dir):
+		os.mkdir(embeddings_dir)
+
 	# Iterate through dataset
-	for data in tqdm(train_dl):
+	for data in tqdm(dl):
 
 		with torch.no_grad():
 			# Generate embeddings 
