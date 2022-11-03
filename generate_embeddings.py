@@ -12,7 +12,7 @@ def main():
 	num_workers = 4
 	dataset_name = "imagenet-1k"
 	embeddings_dir = "imagenet1k_clip_embeddings"
-	dataset_type = "validation"
+	dataset_type = "test"
 
 	# Create data loaders
 	dataset = load_dataset(dataset_name)

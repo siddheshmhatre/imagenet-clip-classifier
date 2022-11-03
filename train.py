@@ -9,8 +9,11 @@ from utils import get_dataloaders
 from model import MLP
 
 import hydra
+import time
 
 def test(model, test_dl, epoch, wandb_run):
+    # TODO - replace accuracy calculation with a meter object
+    start_time = time.time()
     model.eval()
     total_correct = 0
     total_loss = 0.0
@@ -31,7 +34,6 @@ def test(model, test_dl, epoch, wandb_run):
             total_loss += loss
 
             _, argmax = output.max(dim=1)
-            print (argmax)
 
             correct = (argmax == labels).sum() / labels.shape[0]
             total_correct += correct
@@ -39,9 +41,16 @@ def test(model, test_dl, epoch, wandb_run):
             total_iters += 1
 
     print (f"Epoch {epoch}, Test Loss {total_loss / total_iters}, Accuracy: {total_correct / total_iters}")
-    wandb_run.log({"test_loss": total_loss / total_iters, "accuracy" : total_correct / total_iters})
+    wandb_run.log({"test_loss": total_loss / total_iters, "accuracy" : total_correct / total_iters, "epoch": epoch})
+
+    end_time = time.time()
+    total_testing_time = (end_time - start_time) / 60
+    wandb_run.log({"testing_time_in_mins" : total_testing_time})
+    print (f"--------------------------Testing time : {total_testing_time} mins--------------------------")
 
 def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wandb_run):
+    start_time = time.time()
+
     total_loss = 0.0
     total_iters = 0
 
@@ -71,12 +80,12 @@ def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wan
         total_iters += 1
 
         total_loss += loss
-        if index % logging_freq:
-            print(f"Epoch {epoch}, Iteration {total_iters}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
+        if index % logging_freq == 0:
+            print(f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
 
         wandb_run.log({"batch_train_loss" : loss})
 
-    wandb_run.log({"train_loss" : total_loss / total_iters})
+    wandb_run.log({"train_loss" : total_loss / total_iters, "epoch": epoch})
 
     experiment_dir = os.getcwd()
 
@@ -87,6 +96,10 @@ def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wan
                     'optimizer_state_dict' : optimizer.state_dict()},
                     f)
 
+    end_time = time.time()
+    total_training_time = (end_time - start_time) / 60
+    wandb_run.log({"training_time_in_mins" : total_training_time})
+    print (f"--------------------------Training time : {total_training_time} mins--------------------------")
     print (f"--------------------------Testing Epoch: {epoch}--------------------------")
     test_fn(model, test_dl, epoch, wandb_run)
 
@@ -104,7 +117,7 @@ def main(cfg):
 
         wandb.config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
 
-        datasets_dict = load_datasets(cfg.dataset.root_dir)
+        datasets_dict = load_datasets(cfg.dataset.root_dir, cfg.dataset.debug)
         train_ds = datasets_dict['train']
         test_ds = datasets_dict['validation']
         train_dl, test_dl = get_dataloaders(cfg.dataset, train_ds, test_ds)
