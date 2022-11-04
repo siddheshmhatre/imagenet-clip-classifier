@@ -3,13 +3,24 @@ import wandb
 import torch
 from omegaconf import OmegaConf
 import torch.nn.functional as F
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from dataset import load_datasets
 from utils import get_dataloaders
 from model import MLP
 
 import hydra
 import time
+
+def get_optimizer(cfg, model):
+    optim_cfg = cfg.optim
+    optim_class = None
+    if cfg.optim_name.lower() == "adam":
+        optim_class = Adam
+    # Default to SGD
+    else:
+        optim_class = SGD
+
+    return optim_class(model.parameters(), **cfg.optim[cfg.optim_name])
 
 def test(model, test_dl, epoch, wandb_run):
     # TODO - replace accuracy calculation with a meter object
@@ -112,10 +123,9 @@ def main(cfg):
         project=cfg.wandb.project,
         entity=cfg.wandb.entity,
         mode=cfg.wandb.mode,
-        tags=cfg.wandb.tags
+        tags=cfg.wandb.tags,
+        config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     ) as wandb_run:
-
-        wandb.config = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
 
         datasets_dict = load_datasets(cfg.dataset.root_dir, cfg.dataset.debug)
         train_ds = datasets_dict['train']
@@ -126,7 +136,7 @@ def main(cfg):
         model = MLP().to('cuda')
         
         # Create optimizer
-        optim = SGD(model.parameters(), lr=cfg.optim.learning_rate, momentum=cfg.optim.momentum)
+        optim = get_optimizer(cfg, model)
 
         # Call training loop
         for epoch in range(cfg.num_epochs):

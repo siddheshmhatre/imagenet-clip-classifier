@@ -1,9 +1,15 @@
 import os
 import torch
+import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
 from torch.utils.data import DataLoader, BatchSampler, SequentialSampler, RandomSampler
 from transformers import CLIPModel, CLIPFeatureExtractor
+
+def normalize_embeddings(embeddings):
+	l2 = np.atleast_1d(np.linalg.norm(embeddings, ord=2, axis=-1))
+	l2[l2 == 0] = 1
+	return embeddings / np.expand_dims(l2, axis=-1)
 
 def main():
 	# Hard-coding args for now
@@ -12,7 +18,6 @@ def main():
 	num_workers = 4
 	dataset_name = "imagenet-1k"
 	embeddings_dir = "imagenet1k_clip_embeddings"
-	dataset_type = "test"
 
 	# Create data loaders
 	dataset = load_dataset(dataset_name)
@@ -25,8 +30,6 @@ def main():
 
 	dataset.set_transform(transform) # Doing this stops returning "image" as a tensor
 
-	dl = DataLoader(dataset[dataset_type], batch_size=batch_size, num_workers=num_workers, shuffle=True)
-
 	# Create model
 	model = CLIPModel.from_pretrained(model_name)
 	model.to('cuda')
@@ -34,32 +37,31 @@ def main():
 
 	counter = 1
 
-	embeddings_dir = os.path.join(embeddings_dir, dataset_type)
-	if not os.path.exists(embeddings_dir):
-		os.mkdir(embeddings_dir)
-
 	# Iterate through dataset
-	for data in tqdm(dl):
+	for dataset_type in dataset.keys():
+		print (f"Processing {dataset_type}")
+		dl = DataLoader(dataset[dataset_type], batch_size=batch_size, num_workers=num_workers, shuffle=False)
 
-		with torch.no_grad():
-			# Generate embeddings 
-			data['image'] = data['image'].to('cuda')
+		embeddings_dir = os.path.join(embeddings_dir, dataset_type)
+		if not os.path.exists(embeddings_dir):
+			os.mkdir(embeddings_dir)
 
-			embeddings = model.get_image_features(data['image'])
+		for data in tqdm(dl):
 
-			embeddings_dict = {}
-			embeddings_dict['embeddings'] = embeddings
-			embeddings_dict['labels'] = data['label']
-			embeddings_dict['images'] = data['image']
+			with torch.no_grad():
+				# Generate embeddings 
+				data['image'] = data['image'].to('cuda')
 
-			# Save to disk
-			embeddings_dict['embeddings'] = embeddings_dict['embeddings'].to('cpu')
-			embeddings_dict['images'] = embeddings_dict['images'].to('cpu')
-			torch.save(embeddings_dict, f"{embeddings_dir}/{counter}.pt")
+				embeddings = model.get_image_features(data['image']).to('cpu').numpy()
+				data['image'] = data['image'].to('cpu').numpy()
+				data['label'] = data['label'].to('cpu').numpy()
 
-			counter += 1
+				embeddings = normalize_embeddings(embeddings)
 
-			del embeddings_dict
+				filepath = f"{embeddings_dir}/{counter}"
+				np.savez(filepath, embeddings=embeddings, images=data['image'], labels=data['label'])
+
+				counter += 1
 
 if __name__ == "__main__":
 	main()

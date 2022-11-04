@@ -1,25 +1,32 @@
-num_epochs : 10
+num_epochs : 100
 logging_freq : 100
 seed : 1234
 
 dataset:
   root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
-  batch_size : 1024
-  num_workers : 4
+  batch_size : 512
+  num_workers : 8
   download : false
   train_shuffle : true
   test_shuffle : false
   pin_memory : true
   debug : false
 
+optim_name : adam
+
 optim:
-  learning_rate : 0.01
-  momentum : 0.9
+  adam :
+    lr : 1e-3
+    weight_decay : 1e-4
+  sgd :
+    lr : 1e-3
+    momentum : 0.9
+    weight_decay : 1e-4
 
 wandb:
   project : clip_imagenet1k
   entity : sid1793
-  mode : online # [online, offline, disabled]
+  mode : offline # [online, offline, disabled]
   tags :
     - mlp_01
     - clip_embeddings

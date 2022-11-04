@@ -25,6 +25,8 @@ def get_class_text_embeddings(classes, device):
 
 			text_embeddings[idx] = model.get_text_features(**inputs)[0]
 
+		text_embeddings = text_embeddings / torch.unsqueeze(torch.linalg.norm(text_embeddings, ord=2, dim=-1), dim=-1)
+
 		return text_embeddings
 
 @hydra.main(config_path="confs", config_name="config")
@@ -55,6 +57,10 @@ def main(cfg):
 		for data in tqdm(test_dl):
 			# Put embeddings on device
 			image_embeddings = data['embeddings'].to(device) # Batch_size x 1024
+
+			# Normalize image embeddings - TODO - remove this
+			image_embeddings = image_embeddings / torch.unsqueeze(torch.linalg.norm(image_embeddings, ord=2, dim=-1), dim=-1)
+
 			labels = data['labels'].to(device)
 
 			# Compute dot product - Batch_size x 1000

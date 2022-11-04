@@ -1,5 +1,5 @@
 import os
-import torch
+import numpy as np
 from torch.utils.data import Dataset
 
 class ImageNet1kEmbeddings(Dataset):
@@ -13,12 +13,7 @@ class ImageNet1kEmbeddings(Dataset):
 
 	def __getitem__(self, index) -> dict:
 		filepath = os.path.join(self.data_dir, self.files[index])
-		data_dict = torch.load(filepath)
-
-		data_dict['embeddings'] = data_dict['embeddings'][0]
-		data_dict['labels'] = data_dict['labels'][0]
-
-		return data_dict
+		return np.load(filepath)
 
 	def __len__(self) -> int:
 		if self.debug:
