@@ -8,6 +8,7 @@ class ImageNet1kEmbeddings(Dataset):
 
 		self.data_dir = data_dir
 		self.files = list(os.listdir(self.data_dir))
+		import pdb; pdb.set_trace()
 		self.files = sorted(self.files, key=lambda x: int(x.split('.')[0]))
 		self.debug = debug
 
@@ -17,7 +18,7 @@ class ImageNet1kEmbeddings(Dataset):
 
 	def __len__(self) -> int:
 		if self.debug:
-			return 4096
+			return 4
 		else:
 			return len(self.files)
 

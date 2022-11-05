@@ -17,7 +17,7 @@ def main():
 	batch_size = 1
 	num_workers = 4
 	dataset_name = "imagenet-1k"
-	embeddings_dir = "imagenet1k_clip_embeddings"
+	embeddings_root_dir = "imagenet1k_clip_embeddings"
 
 	# Create data loaders
 	dataset = load_dataset(dataset_name)
@@ -35,14 +35,13 @@ def main():
 	model.to('cuda')
 	print (f"MODEL {model.device}")
 
-	counter = 1
-
 	# Iterate through dataset
 	for dataset_type in dataset.keys():
+		counter = 1
 		print (f"Processing {dataset_type}")
 		dl = DataLoader(dataset[dataset_type], batch_size=batch_size, num_workers=num_workers, shuffle=False)
 
-		embeddings_dir = os.path.join(embeddings_dir, dataset_type)
+		embeddings_dir = os.path.join(embeddings_root_dir, dataset_type)
 		if not os.path.exists(embeddings_dir):
 			os.mkdir(embeddings_dir)
 
