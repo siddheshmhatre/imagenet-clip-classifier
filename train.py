@@ -7,12 +7,12 @@ from torch.optim import SGD, Adam
 from dataset import load_datasets
 from utils import get_dataloaders
 from model import MLP
+import torch.autograd.profiler as profiler
 
 import hydra
 import time
 
 def get_optimizer(cfg, model):
-    optim_cfg = cfg.optim
     optim_class = None
     if cfg.optim_name.lower() == "adam":
         optim_class = Adam
@@ -59,7 +59,7 @@ def test(model, test_dl, epoch, wandb_run):
     wandb_run.log({"testing_time_in_mins" : total_testing_time})
     print (f"--------------------------Testing time : {total_testing_time} mins--------------------------")
 
-def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wandb_run):
+def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, cfg): 
     start_time = time.time()
 
     total_loss = 0.0
@@ -91,7 +91,7 @@ def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wan
         total_iters += 1
 
         total_loss += loss
-        if index % logging_freq == 0:
+        if index % cfg.logging_freq == 0:
             print(f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
 
         wandb_run.log({"batch_train_loss" : loss})
@@ -112,7 +112,9 @@ def train(model, train_dl, test_dl, optimizer, logging_freq, epoch, test_fn, wan
     wandb_run.log({"training_time_in_mins" : total_training_time})
     print (f"--------------------------Training time : {total_training_time} mins--------------------------")
     print (f"--------------------------Testing Epoch: {epoch}--------------------------")
-    test_fn(model, test_dl, epoch, wandb_run)
+
+    if cfg.test:
+        test_fn(model, test_dl, epoch, wandb_run)
 
 @hydra.main(config_path="confs", config_name="config")
 def main(cfg):
@@ -127,7 +129,7 @@ def main(cfg):
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     ) as wandb_run:
 
-        datasets_dict = load_datasets(cfg.dataset.root_dir, cfg.dataset.debug)
+        datasets_dict = load_datasets(cfg.dataset.root_dir, cfg)
         train_ds = datasets_dict['train']
         test_ds = datasets_dict['validation']
         train_dl, test_dl = get_dataloaders(cfg.dataset, train_ds, test_ds)
@@ -140,7 +142,7 @@ def main(cfg):
 
         # Call training loop
         for epoch in range(cfg.num_epochs):
-            train(model, train_dl, test_dl, optim, cfg.logging_freq, epoch, test, wandb_run)
+            train(model, train_dl, test_dl, optim, epoch, test, wandb_run, cfg)
 
 if __name__ == "__main__":
     main()
