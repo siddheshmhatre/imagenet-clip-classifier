@@ -4,10 +4,10 @@ import torch
 from omegaconf import OmegaConf
 import torch.nn.functional as F
 from torch.optim import SGD, Adam
+import dataset_ffcv as ffcv
 from dataset import load_datasets
 from utils import get_dataloaders
 from model import MLP
-import torch.autograd.profiler as profiler
 
 import hydra
 import time
@@ -34,8 +34,11 @@ def test(model, test_dl, epoch, wandb_run):
 
         for index, sample in enumerate(test_dl):
             # Forward pass
-            embeddings = sample['embeddings'].to('cuda')
-            labels = sample['labels'].to('cuda')
+            _, labels, embeddings = sample
+
+            labels = labels.to('cuda').squeeze()
+            embeddings = embeddings.to('cuda')
+
             output = model(embeddings)
 
             # Apply softmax to output?
@@ -75,8 +78,10 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, cfg):
         optimizer.zero_grad()
 
         # Forward pass
-        embeddings = sample['embeddings'].to('cuda')
-        labels = sample['labels'].to('cuda')
+        _, labels, embeddings = sample
+        labels = labels.to('cuda').squeeze()
+        embeddings = embeddings.to('cuda')
+
         output = model(embeddings)
 
         # Compute loss
@@ -132,7 +137,11 @@ def main(cfg):
         datasets_dict = load_datasets(cfg.dataset.root_dir, cfg)
         train_ds = datasets_dict['train']
         test_ds = datasets_dict['validation']
-        train_dl, test_dl = get_dataloaders(cfg.dataset, train_ds, test_ds)
+
+        if cfg.dataset.type == "pytorch":
+            train_dl, test_dl = get_dataloaders(cfg.dataset, train_ds, test_ds)
+        elif cfg.dataset.type == "ffcv":
+            train_dl, test_dl = ffcv.get_dataloaders(cfg.dataset, train_ds, test_ds)
 
         # Initialize model and perform logging
         model = MLP().to('cuda')

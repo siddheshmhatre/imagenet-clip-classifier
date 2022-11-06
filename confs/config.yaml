@@ -5,9 +5,10 @@ test : true
 
 dataset:
   root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
-  batch_size : 512
+  batch_size : 2048
   num_workers : 8
   download : false
+  type : pytorch # pytorch or fccv
   train_shuffle : true
   test_shuffle : false
   pin_memory : true

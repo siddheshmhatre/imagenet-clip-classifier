@@ -13,11 +13,13 @@ class ImageNet1kEmbeddings(Dataset):
 
 	def __getitem__(self, index) -> dict:
 		filepath = os.path.join(self.data_dir, self.files[index])
-		return {key : value[0] for key, value in np.load(filepath).items()}
+		data = np.load(filepath)
+		images = np.transpose(data['images'], (0, 2, 3, 1)).astype(np.uint8)
+		return (images[0], data['labels'][0], data['embeddings'][0])
 
 	def __len__(self) -> int:
 		if self.cfg.dataset.debug:
-			return self.cfg.dataset.batch_size * self.cfg.dataset.num_workers * 2
+			return min(len(self.files), 81920)
 		else:
 			return len(self.files)
 
