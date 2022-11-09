@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.optim import SGD, Adam
 import dataset_ffcv as ffcv
 from dataset import load_datasets
-from utils import get_dataloaders
+from utils import get_dataloaders, add_key_value_pair
 from model import MLP
 
 import hydra
@@ -125,6 +125,8 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, loggin
 def main(cfg):
 
     torch.manual_seed(cfg.seed)
+    add_key_value_pair(cfg, "output_dir", os.getcwd())
+    import pdb; pdb.set_trace()
 
     with wandb.init(
         project=cfg.wandb.project,
