@@ -144,7 +144,10 @@ def main(cfg):
             train_dl, test_dl = ffcv.get_dataloaders(cfg.dataset, train_ds, test_ds)
 
         # Initialize model and perform logging
-        model = MLP().to('cuda')
+        model = MLP(**cfg.model).to('cuda')
+
+        if cfg.wandb.watch:
+            wandb_run.watch(model, log='all', log_freq=cfg.logging_freq, log_graph=True)
         
         # Create optimizer
         optim = get_optimizer(cfg, model)

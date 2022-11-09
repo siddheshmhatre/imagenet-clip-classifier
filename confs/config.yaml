@@ -3,12 +3,21 @@ logging_freq : 100
 seed : 1234
 test : true
 
+model:
+  input_dim : 1024
+  num_classes : 1000
+  layers : 
+    - 512
+    - 512
+  activation : "relu"
+  batch_norm : false
+
 dataset:
   root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
   batch_size : 2048
   num_workers : 8
   download : false
-  type : pytorch # pytorch or fccv
+  type : pytorch # pytorch or ffcv
   train_shuffle : true
   test_shuffle : false
   pin_memory : true
@@ -29,6 +38,7 @@ wandb:
   project : clip_imagenet1k
   entity : sid1793
   mode : online # [online, offline, disabled]
+  watch : false
   tags :
     - mlp_01
     - clip_embeddings
