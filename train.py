@@ -126,7 +126,6 @@ def main(cfg):
 
     torch.manual_seed(cfg.seed)
     add_key_value_pair(cfg, "output_dir", os.getcwd())
-    import pdb; pdb.set_trace()
 
     with wandb.init(
         project=cfg.wandb.project,
@@ -141,9 +140,9 @@ def main(cfg):
         test_ds = datasets_dict['validation']
 
         if cfg.dataset_type == "pytorch":
-            train_dl, test_dl = get_dataloaders(train_ds, test_ds, **cfg.dataset, **cfg.dataloader)
+            train_dl, test_dl = get_dataloaders(train_ds=train_ds, test_ds=test_ds, **cfg.dataset, **cfg.dataloader)
         elif cfg.dataset_type == "ffcv":
-            train_dl, test_dl = ffcv.get_dataloaders(train_ds, test_ds, **cfg.dataset, **cfg.dataloader)
+            train_dl, test_dl = ffcv.get_dataloaders(train_ds=train_ds, test_ds=test_ds, **cfg.dataset, **cfg.dataloader)
 
         # Initialize model and perform logging
         model = MLP(**cfg.model).to('cuda')
