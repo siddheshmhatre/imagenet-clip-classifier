@@ -62,7 +62,7 @@ def test(model, test_dl, epoch, wandb_run):
     wandb_run.log({"testing_time_in_mins" : total_testing_time})
     print (f"--------------------------Testing time : {total_testing_time} mins--------------------------")
 
-def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, cfg): 
+def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, logging_freq, test): 
     start_time = time.time()
 
     total_loss = 0.0
@@ -96,7 +96,7 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, cfg):
         total_iters += 1
 
         total_loss += loss
-        if index % cfg.logging_freq == 0:
+        if index % logging_freq == 0:
             print(f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
 
         wandb_run.log({"batch_train_loss" : loss})
@@ -118,7 +118,7 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, cfg):
     print (f"--------------------------Training time : {total_training_time} mins--------------------------")
     print (f"--------------------------Testing Epoch: {epoch}--------------------------")
 
-    if cfg.test:
+    if test:
         test_fn(model, test_dl, epoch, wandb_run)
 
 @hydra.main(config_path="confs", config_name="config")
@@ -134,14 +134,14 @@ def main(cfg):
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     ) as wandb_run:
 
-        datasets_dict = load_datasets(cfg.dataset.root_dir, cfg)
+        datasets_dict = load_datasets(**cfg.dataset)
         train_ds = datasets_dict['train']
         test_ds = datasets_dict['validation']
 
-        if cfg.dataset.type == "pytorch":
-            train_dl, test_dl = get_dataloaders(cfg.dataset, train_ds, test_ds)
-        elif cfg.dataset.type == "ffcv":
-            train_dl, test_dl = ffcv.get_dataloaders(cfg.dataset, train_ds, test_ds)
+        if cfg.dataset_type == "pytorch":
+            train_dl, test_dl = get_dataloaders(train_ds, test_ds, **cfg.dataset, **cfg.dataloader)
+        elif cfg.dataset_type == "ffcv":
+            train_dl, test_dl = ffcv.get_dataloaders(train_ds, test_ds, **cfg.dataset, **cfg.dataloader)
 
         # Initialize model and perform logging
         model = MLP(**cfg.model).to('cuda')
@@ -154,7 +154,7 @@ def main(cfg):
 
         # Call training loop
         for epoch in range(cfg.num_epochs):
-            train(model, train_dl, test_dl, optim, epoch, test, wandb_run, cfg)
+            train(model, train_dl, test_dl, optim, epoch, test, wandb_run, cfg.logging_freq, cfg.test)
 
 if __name__ == "__main__":
     main()

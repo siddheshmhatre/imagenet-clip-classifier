@@ -2,6 +2,13 @@ num_epochs : 100
 logging_freq : 100
 seed : 1234
 test : true
+dataset_type : ffcv # pytorch or ffcv
+
+dataloader:
+  batch_size : 2048
+  num_workers : 8
+  train_shuffle : true
+  test_shuffle : false
 
 model:
   input_dim : 1024
@@ -14,13 +21,6 @@ model:
 
 dataset:
   root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
-  batch_size : 2048
-  num_workers : 8
-  download : false
-  type : pytorch # pytorch or ffcv
-  train_shuffle : true
-  test_shuffle : false
-  pin_memory : true
   debug : false
 
 optim_name : adam
