@@ -15,17 +15,23 @@ def convert_to_ffcv(dataset, ffcv_filepath):
 				'embeddings' : NDArrayField(shape=(1024,), dtype=np.dtype('float32'))})
 	writer.from_indexed_dataset(dataset)
 
-def get_dataloaders(debug, root_dir, train_shuffle, test_shuffle, batch_size, num_workers, train_ds=None, test_ds=None):
+def get_dataloaders(debug, root_dir, train_shuffle, test_shuffle, 
+				    batch_size, num_workers, train_ds=None, validation_ds=None, test_ds=None):
 
 	if debug:
 		train_filepath = os.path.join(root_dir, f"temp_train_{len(train_ds)}.beton")
+		validation_filepath = os.path.join(root_dir, f"temp_validation_{len(validation_ds)}.beton")
 		test_filepath = os.path.join(root_dir, f"temp_test_{len(test_ds)}.beton")
 	else:
 		train_filepath = os.path.join(root_dir, "train.beton")
+		validation_filepath = os.path.join(root_dir, "validation.beton")
 		test_filepath = os.path.join(root_dir, "test.beton")
 
 	if not os.path.exists(train_filepath):
 		convert_to_ffcv(train_ds, train_filepath)
+
+	if not os.path.exists(validation_filepath):
+		convert_to_ffcv(validation_ds, validation_filepath)
 
 	if not os.path.exists(test_filepath):
 		convert_to_ffcv(test_ds, test_filepath)
@@ -38,11 +44,14 @@ def get_dataloaders(debug, root_dir, train_shuffle, test_shuffle, batch_size, nu
 	test_shuffle = OrderOption.RANDOM if test_shuffle else OrderOption.SEQUENTIAL
 
 	train_dl = Loader(train_filepath, batch_size=batch_size, 
-					  num_workers=num_workers, order=train_shuffle, pipelines=pipelines)
+					  num_workers=num_workers, order=train_shuffle, pipelines=pipelines, drop_last=False)
+
+	validation_dl = Loader(validation_filepath, batch_size=batch_size, 
+						num_workers=num_workers, order=test_shuffle, pipelines=pipelines, drop_last=False)
 
 	test_dl = Loader(test_filepath, batch_size=batch_size, 
-					  num_workers=num_workers, order=test_shuffle, pipelines=pipelines)
+					  num_workers=num_workers, order=test_shuffle, pipelines=pipelines, drop_last=False)
 
-	return train_dl, test_dl
+	return train_dl, validation_dl, test_dl
 
 	

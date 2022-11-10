@@ -137,12 +137,15 @@ def main(cfg):
 
         datasets_dict = load_datasets(**cfg.dataset)
         train_ds = datasets_dict['train']
-        test_ds = datasets_dict['validation']
+        validation_ds = datasets_dict['validation']
+        test_ds = datasets_dict['test']
 
         if cfg.dataset_type == "pytorch":
-            train_dl, test_dl = get_dataloaders(train_ds=train_ds, test_ds=test_ds, **cfg.dataset, **cfg.dataloader)
+            train_dl, validation_dl, _ = get_dataloaders(train_ds=train_ds, validation_ds=validation_ds, test_ds=test_ds, 
+                                                         **cfg.dataset, **cfg.dataloader)
         elif cfg.dataset_type == "ffcv":
-            train_dl, test_dl = ffcv.get_dataloaders(train_ds=train_ds, test_ds=test_ds, **cfg.dataset, **cfg.dataloader)
+            train_dl, validation_dl, _ = ffcv.get_dataloaders(train_ds=train_ds, validation_ds=validation_ds, test_ds=test_ds, 
+                                                              **cfg.dataset, **cfg.dataloader)
 
         # Initialize model and perform logging
         model = MLP(**cfg.model).to('cuda')
@@ -155,7 +158,7 @@ def main(cfg):
 
         # Call training loop
         for epoch in range(cfg.num_epochs):
-            train(model, train_dl, test_dl, optim, epoch, test, wandb_run, cfg.logging_freq, cfg.test)
+            train(model, train_dl, validation_dl, optim, epoch, test, wandb_run, cfg.logging_freq, cfg.test)
 
 if __name__ == "__main__":
     main()

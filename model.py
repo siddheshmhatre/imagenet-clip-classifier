@@ -27,7 +27,7 @@ class MLP(nn.Module):
 
 				self.layers.append(self.activation())
 
-		self.layers.append(nn.Linear(layers[-1], num_classes))
+		self.layers.append(nn.Linear(layers[-1], num_classes, bias=False))
 
 	def forward(self, x):
 		for layer in self.layers:
