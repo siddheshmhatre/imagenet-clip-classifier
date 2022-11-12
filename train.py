@@ -8,6 +8,9 @@ import dataset_ffcv as ffcv
 from dataset import load_datasets
 from utils import get_dataloaders, add_key_value_pair
 from model import MLP
+from torch.optim.lr_scheduler import CosineAnnealingLR
+
+import pytorch_warmup as warmup
 
 import hydra
 import time
@@ -21,6 +24,12 @@ def get_optimizer(cfg, model):
         optim_class = SGD
 
     return optim_class(model.parameters(), **cfg.optim[cfg.optim_name])
+
+def get_lr_scheduler(cfg, optim, num_iters_per_epoch):
+    lr_scheduler_class = None
+    if cfg.lr_scheduler_name.lower() == "cosine":
+        return CosineAnnealingLR(optim, T_max=num_iters_per_epoch * cfg.lr_scheduler.cosine.num_epochs)
+    return None
 
 def test(model, test_dl, epoch, wandb_run):
     # TODO - replace accuracy calculation with a meter object
@@ -62,9 +71,10 @@ def test(model, test_dl, epoch, wandb_run):
     wandb_run.log({"testing_time_in_mins" : total_testing_time})
     print (f"--------------------------Testing time : {total_testing_time} mins--------------------------")
 
-def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, logging_freq, test): 
+def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, lr_scheduler, logging_freq, test): 
     start_time = time.time()
 
+    total_correct = 0
     total_loss = 0.0
     total_iters = 0
 
@@ -93,15 +103,27 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, loggin
         # Step optimizer
         optimizer.step()
 
+        # Get predictions
+        _, argmax = output.max(dim=1)
+
+        correct = (argmax == labels).sum() / labels.shape[0]
+        total_correct += correct
+
         total_iters += 1
 
         total_loss += loss
         if index % logging_freq == 0:
             print(f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
 
-        wandb_run.log({"batch_train_loss" : loss})
+        if lr_scheduler is not None:
+            # Step lr scheduler
+            lr_scheduler.step()
+            learning_rate = lr_scheduler.get_last_lr()[0]
+            wandb_run.log({"batch_train_loss" : loss, "learning_rate" : torch.tensor(learning_rate)})
+        else:
+            wandb_run.log({"batch_train_loss" : loss})
 
-    wandb_run.log({"train_loss" : total_loss / total_iters, "epoch": epoch})
+    wandb_run.log({"train_loss" : total_loss / total_iters, "train_accuracy" : total_correct / total_iters, "epoch": epoch})
 
     experiment_dir = os.getcwd()
 
@@ -156,9 +178,12 @@ def main(cfg):
         # Create optimizer
         optim = get_optimizer(cfg, model)
 
+        # LR scheduler
+        lr_scheduler = get_lr_scheduler(cfg, optim, len(train_dl))
+
         # Call training loop
         for epoch in range(cfg.num_epochs):
-            train(model, train_dl, validation_dl, optim, epoch, test, wandb_run, cfg.logging_freq, cfg.test)
+            train(model, train_dl, validation_dl, optim, epoch, test, wandb_run, lr_scheduler, cfg.logging_freq, cfg.test)
 
 if __name__ == "__main__":
     main()

@@ -19,6 +19,12 @@ model:
   activation : "relu"
   batch_norm : false
 
+lr_scheduler_name : cosine
+
+lr_scheduler:
+  cosine :
+    num_epochs : 20
+
 dataset:
   root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
   debug : false
