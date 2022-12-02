@@ -1,31 +1,35 @@
 import os
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
+
 class ImageNet1kEmbeddings(Dataset):
-	def __init__(self, root_dir, debug) -> None:
-		super().__init__()
+    def __init__(self, features, targets, debug=False) -> None:
+        super().__init__()
 
-		self.root_dir = root_dir
-		self.files = list(os.listdir(self.root_dir))
-		self.files = sorted(self.files, key=lambda x: int(x.split('.')[0]))
-		self.debug = debug
+        self.debug = debug
+        self.features = features
+        self.targets = targets
 
-	def __getitem__(self, index) -> dict:
-		filepath = os.path.join(self.root_dir, self.files[index])
-		data = np.load(filepath)
-		images = np.transpose(data['images'], (0, 2, 3, 1)).astype(np.uint8)
-		return (images[0], data['labels'][0], data['embeddings'][0])
+    def __getitem__(self, index):
+        return self.features[index], self.targets[index]
 
-	def __len__(self) -> int:
-		if self.debug:
-			return min(len(self.files), 81920)
-		else:
-			return len(self.files)
+    def __len__(self) -> int:
+        if self.debug:
+            return min(self.features.shape[0], 81920)
+        else:
+            return self.features.shape[0]
+
 
 def load_datasets(root_dir, debug) -> dict:
-	datasets_dict = {}
-	datasets_dict['train'] = ImageNet1kEmbeddings(os.path.join(root_dir, 'train'), debug)
-	datasets_dict['validation'] = ImageNet1kEmbeddings(os.path.join(root_dir, 'validation'), debug)
-	datasets_dict['test'] = ImageNet1kEmbeddings(os.path.join(root_dir, 'test'), debug)
-	return datasets_dict
+    datasets_dict = {}
+    train_features = torch.load(os.path.join(root_dir, "features_train.pt"))
+    train_targets = torch.load(os.path.join(root_dir, "targets_train.pt"))
+    datasets_dict["train"] = ImageNet1kEmbeddings(train_features, train_targets, debug)
+
+    val_features = torch.load(os.path.join(root_dir, "features_val.pt"))
+    val_targets = torch.load(os.path.join(root_dir, "targets_val.pt"))
+    datasets_dict["validation"] = ImageNet1kEmbeddings(val_features, val_targets, debug)
+    datasets_dict["test"] = None
+    return datasets_dict

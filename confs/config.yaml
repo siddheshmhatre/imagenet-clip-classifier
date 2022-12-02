@@ -2,10 +2,10 @@ num_epochs : 100
 logging_freq : 100
 seed : 1234
 test : true
-dataset_type : ffcv # pytorch or ffcv
+random_noise : true
 
 dataloader:
-  batch_size : 2048
+  batch_size : 16384
   num_workers : 8
   train_shuffle : true
   test_shuffle : false
@@ -14,10 +14,10 @@ model:
   input_dim : 1024
   num_classes : 1000
   layers : 
-    - 512
-    - 512
+    - 4096
+    - 2048
   activation : "relu"
-  batch_norm : false
+  norm_layer : "layer"
 
 lr_scheduler_name : cosine
 
@@ -26,14 +26,14 @@ lr_scheduler:
     num_epochs : 20
 
 dataset:
-  root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings
+  root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings # change this to the dir where embeddings are stored
   debug : false
 
 optim_name : adam
 
 optim:
   adam :
-    lr : 1e-3
+    lr : 3e-4
     weight_decay : 1e-4
   sgd :
     lr : 1e-3
@@ -43,7 +43,7 @@ optim:
 wandb:
   project : clip_imagenet1k
   entity : sid1793
-  mode : online # [online, offline, disabled]
+  mode : disabled # [online, offline, disabled]
   watch : false
   tags :
     - mlp_01

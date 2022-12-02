@@ -4,16 +4,14 @@ import torch
 from omegaconf import OmegaConf
 import torch.nn.functional as F
 from torch.optim import SGD, Adam
-import dataset_ffcv as ffcv
 from dataset import load_datasets
 from utils import get_dataloaders, add_key_value_pair
 from model import MLP
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-import pytorch_warmup as warmup
-
 import hydra
 import time
+
 
 def get_optimizer(cfg, model):
     optim_class = None
@@ -25,11 +23,15 @@ def get_optimizer(cfg, model):
 
     return optim_class(model.parameters(), **cfg.optim[cfg.optim_name])
 
+
 def get_lr_scheduler(cfg, optim, num_iters_per_epoch):
     lr_scheduler_class = None
     if cfg.lr_scheduler_name.lower() == "cosine":
-        return CosineAnnealingLR(optim, T_max=num_iters_per_epoch * cfg.lr_scheduler.cosine.num_epochs)
+        return CosineAnnealingLR(
+            optim, T_max=num_iters_per_epoch * cfg.lr_scheduler.cosine.num_epochs
+        )
     return None
+
 
 def test(model, test_dl, epoch, wandb_run):
     # TODO - replace accuracy calculation with a meter object
@@ -43,15 +45,15 @@ def test(model, test_dl, epoch, wandb_run):
 
         for index, sample in enumerate(test_dl):
             # Forward pass
-            _, labels, embeddings = sample
+            embeddings, labels = sample
 
-            labels = labels.to('cuda').squeeze()
-            embeddings = embeddings.to('cuda')
+            labels = labels.to("cuda").squeeze()
+            embeddings = embeddings.to("cuda")
 
             output = model(embeddings)
 
             # Apply softmax to output?
-            # Compute arg max 
+            # Compute arg max
             # Calculate loss and num correct
             loss = F.cross_entropy(output, labels)
             total_loss += loss
@@ -63,15 +65,38 @@ def test(model, test_dl, epoch, wandb_run):
 
             total_iters += 1
 
-    print (f"Epoch {epoch}, Test Loss {total_loss / total_iters}, Accuracy: {total_correct / total_iters}")
-    wandb_run.log({"test_loss": total_loss / total_iters, "accuracy" : total_correct / total_iters, "epoch": epoch})
+    print(
+        f"Epoch {epoch}, Test Loss {total_loss / total_iters}, Accuracy: {total_correct / total_iters}"
+    )
+    wandb_run.log(
+        {
+            "test_loss": total_loss / total_iters,
+            "accuracy": total_correct / total_iters,
+            "epoch": epoch,
+        }
+    )
 
     end_time = time.time()
     total_testing_time = (end_time - start_time) / 60
-    wandb_run.log({"testing_time_in_mins" : total_testing_time})
-    print (f"--------------------------Testing time : {total_testing_time} mins--------------------------")
+    wandb_run.log({"testing_time_in_mins": total_testing_time})
+    print(
+        f"--------------------------Testing time : {total_testing_time} mins--------------------------"
+    )
 
-def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, lr_scheduler, logging_freq, test): 
+
+def train(
+    model,
+    train_dl,
+    test_dl,
+    optimizer,
+    epoch,
+    test_fn,
+    wandb_run,
+    lr_scheduler,
+    logging_freq,
+    test,
+    random_noise,
+):
     start_time = time.time()
 
     total_correct = 0
@@ -81,23 +106,29 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, lr_sch
     # Put model in train mode
     model.train()
 
-    print (f"--------------------------Trainin Epoch: {epoch}--------------------------")
+    print(f"--------------------------Trainin Epoch: {epoch}--------------------------")
 
     for index, sample in enumerate(train_dl):
         # Zero grad
         optimizer.zero_grad()
 
         # Forward pass
-        _, labels, embeddings = sample
-        labels = labels.to('cuda').squeeze()
-        embeddings = embeddings.to('cuda')
+        embeddings, labels = sample
+        labels = labels.to("cuda").squeeze()
+        embeddings = embeddings.to("cuda")
+
+        # Add random noise
+        if random_noise:
+            noise = 2 * torch.randn(embeddings.size()).to("cuda")
+            noise = F.normalize(noise, dim=1)
+            embeddings += noise
 
         output = model(embeddings)
 
         # Compute loss
         loss = F.cross_entropy(output, labels)
 
-        # Compute gradients 
+        # Compute gradients
         loss.backward()
 
         # Step optimizer
@@ -113,35 +144,58 @@ def train(model, train_dl, test_dl, optimizer, epoch, test_fn, wandb_run, lr_sch
 
         total_loss += loss
         if index % logging_freq == 0:
-            print(f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}")
+            print(
+                f"Epoch {epoch}, Iteration {total_iters} / {len(train_dl)}, Batch loss {loss}, Average Total loss {total_loss / (total_iters)}"
+            )
 
         if lr_scheduler is not None:
             # Step lr scheduler
             lr_scheduler.step()
             learning_rate = lr_scheduler.get_last_lr()[0]
-            wandb_run.log({"batch_train_loss" : loss, "learning_rate" : torch.tensor(learning_rate)})
+            wandb_run.log(
+                {
+                    "batch_train_loss": loss,
+                    "learning_rate_per_iter": torch.tensor(learning_rate),
+                }
+            )
         else:
-            wandb_run.log({"batch_train_loss" : loss})
+            wandb_run.log({"batch_train_loss": loss})
 
-    wandb_run.log({"train_loss" : total_loss / total_iters, "train_accuracy" : total_correct / total_iters, "epoch": epoch})
+    log_dict = {
+        "train_loss": total_loss / total_iters,
+        "train_accuracy": total_correct / total_iters,
+        "epoch": epoch,
+    }
+
+    if lr_scheduler is not None:
+        log_dict["learning_rate"] = torch.tensor(lr_scheduler.get_last_lr()[0])
+
+    wandb_run.log(log_dict)
 
     experiment_dir = os.getcwd()
 
     # Save model to disk
-    with open(os.path.join(experiment_dir, f'model_{epoch}.ckpt'), 'wb') as f:
-        torch.save({'epoch' : epoch, 
-                    'model_state_dict' : model.state_dict(), 
-                    'optimizer_state_dict' : optimizer.state_dict()},
-                    f)
+    with open(os.path.join(experiment_dir, f"model_{epoch}.ckpt"), "wb") as f:
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+            },
+            f,
+        )
 
     end_time = time.time()
     total_training_time = (end_time - start_time) / 60
-    wandb_run.log({"training_time_in_mins" : total_training_time})
-    print (f"--------------------------Training time : {total_training_time} mins--------------------------")
-    print (f"--------------------------Testing Epoch: {epoch}--------------------------")
+    wandb_run.log({"training_time_in_mins": total_training_time})
+    print(
+        f"--------------------------Training time : {total_training_time} mins--------------------------"
+    )
+    print(f"--------------------------Testing Epoch: {epoch}--------------------------")
 
     if test:
         test_fn(model, test_dl, epoch, wandb_run)
+
 
 @hydra.main(config_path="confs", config_name="config")
 def main(cfg):
@@ -154,27 +208,31 @@ def main(cfg):
         entity=cfg.wandb.entity,
         mode=cfg.wandb.mode,
         tags=cfg.wandb.tags,
-        config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+        config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
     ) as wandb_run:
 
-        datasets_dict = load_datasets(**cfg.dataset)
-        train_ds = datasets_dict['train']
-        validation_ds = datasets_dict['validation']
-        test_ds = datasets_dict['test']
+        train_ds = None
+        validation_ds = None
+        test_ds = None
 
-        if cfg.dataset_type == "pytorch":
-            train_dl, validation_dl, _ = get_dataloaders(train_ds=train_ds, validation_ds=validation_ds, test_ds=test_ds, 
-                                                         **cfg.dataset, **cfg.dataloader)
-        elif cfg.dataset_type == "ffcv":
-            train_dl, validation_dl, _ = ffcv.get_dataloaders(train_ds=train_ds, validation_ds=validation_ds, test_ds=test_ds, 
-                                                              **cfg.dataset, **cfg.dataloader)
+        datasets_dict = load_datasets(**cfg.dataset)
+        train_ds = datasets_dict["train"]
+        validation_ds = datasets_dict["validation"]
+        test_ds = datasets_dict["test"]
+        train_dl, validation_dl, _ = get_dataloaders(
+            train_ds=train_ds,
+            validation_ds=validation_ds,
+            test_ds=test_ds,
+            **cfg.dataset,
+            **cfg.dataloader,
+        )
 
         # Initialize model and perform logging
-        model = MLP(**cfg.model).to('cuda')
+        model = MLP(**cfg.model).to("cuda")
 
         if cfg.wandb.watch:
-            wandb_run.watch(model, log='all', log_freq=cfg.logging_freq, log_graph=True)
-        
+            wandb_run.watch(model, log="all", log_freq=cfg.logging_freq, log_graph=True)
+
         # Create optimizer
         optim = get_optimizer(cfg, model)
 
@@ -183,7 +241,20 @@ def main(cfg):
 
         # Call training loop
         for epoch in range(cfg.num_epochs):
-            train(model, train_dl, validation_dl, optim, epoch, test, wandb_run, lr_scheduler, cfg.logging_freq, cfg.test)
+            train(
+                model,
+                train_dl,
+                validation_dl,
+                optim,
+                epoch,
+                test,
+                wandb_run,
+                lr_scheduler,
+                cfg.logging_freq,
+                cfg.test,
+                cfg.random_noise,
+            )
+
 
 if __name__ == "__main__":
     main()
