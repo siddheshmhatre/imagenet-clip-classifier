@@ -26,7 +26,7 @@ lr_scheduler:
     num_epochs : 20
 
 dataset:
-  root_dir : /home/siddhesh1793/code/imagenet-clip-classifier/imagenet1k_clip_embeddings # change this to the dir where embeddings are stored
+  root_dir : imagenet1k_clip_embeddings # change this to the dir where embeddings are stored
   debug : false
 
 optim_name : adam
