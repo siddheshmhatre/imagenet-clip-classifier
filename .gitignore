@@ -2,3 +2,4 @@
 imagenet1k_clip_embeddings/*
 outputs/*
 __pycache__/*
+.vscode/*
